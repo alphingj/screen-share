@@ -12,14 +12,17 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
-            height: 100vh;
-            overflow: hidden;
+            justify-content: flex-start;
+            min-height: 100vh;
+            overflow-x: hidden;
         }
+
         #welcome-container {
             text-align: center;
             position: relative;
+            margin-top: 20px;
         }
+
         #welcome-container::before {
             content: '';
             position: absolute;
@@ -32,10 +35,12 @@
             z-index: -1;
             animation: moveLines 5s linear infinite;
         }
+
         @keyframes moveLines {
             0% { transform: translateX(-100%); }
             100% { transform: translateX(100%); }
         }
+
         #code-section {
             background-color: rgba(0, 0, 0, 0.8);
             padding: 20px;
@@ -43,6 +48,7 @@
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
             margin-bottom: 20px;
         }
+
         #room-code {
             padding: 10px;
             border: 1px solid #555;
@@ -51,6 +57,7 @@
             color: #fff;
             margin-right: 10px;
         }
+
         #join-btn, #create-btn {
             padding: 10px 20px;
             background-color: violet;
@@ -60,27 +67,33 @@
             cursor: pointer;
             margin: 5px;
         }
+
         #video-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 10px;
-            width: 80%;
+            width: 90%;
             max-width: 1200px;
+            margin-top: 20px;
         }
+
         video {
             width: 100%;
             height: auto;
             background-color: #222;
             border-radius: 5px;
         }
+
         #screen-share-section {
             margin-top: 20px;
-            width: 80%;
+            width: 90%;
             max-width: 1200px;
         }
+
         #controls {
             margin-top: 20px;
         }
+
         #controls button {
             background-color: #333;
             color: #fff;
@@ -90,13 +103,16 @@
             margin: 5px;
             cursor: pointer;
         }
+
         #controls button img {
             width: 24px;
             height: 24px;
         }
+
         .participant {
             position: relative;
         }
+
         .participant-name {
             position: absolute;
             bottom: 0;
@@ -105,6 +121,7 @@
             color: white;
             padding: 5px;
         }
+
         .muted-video::after, .muted-audio::after {
             content: '\uD83D\uDD07';
             position: absolute;
@@ -114,6 +131,7 @@
             color: white;
             padding: 5px;
         }
+
         #screen-share-btn {
             background-color: violet;
             color: white;
@@ -123,6 +141,7 @@
             cursor: pointer;
             margin-top: 10px;
         }
+
         #leave-btn {
             background-color: #ff4444;
             color: white;
@@ -132,12 +151,14 @@
             cursor: pointer;
             margin: 5px;
         }
+
         #generated-code {
             font-size: 24px;
             font-weight: bold;
             color: violet;
             margin: 15px 0;
         }
+
         #code-display {
             display: none;
             margin-top: 15px;
@@ -146,11 +167,13 @@
             border-radius: 10px;
             animation: pulse 2s infinite;
         }
+
         @keyframes pulse {
             0% { box-shadow: 0 0 0 0 rgba(128, 0, 128, 0.4); }
             70% { box-shadow: 0 0 0 10px rgba(128, 0, 128, 0); }
             100% { box-shadow: 0 0 0 0 rgba(128, 0, 128, 0); }
         }
+
         #copy-code {
             background-color: #555;
             color: white;
@@ -160,6 +183,7 @@
             cursor: pointer;
             margin-left: 10px;
         }
+
         #copy-code:hover {
             background-color: #777;
         }
@@ -189,12 +213,12 @@
     <div id="screen-share-section" style="display: none;">
         <video id="screen-share-video" autoplay></video>
         <button id="screen-share-btn">Share Screen</button>
-    </div>
     <div id="controls" style="display: none;">
         <button id="video-toggle"><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z'/%3E%3C/svg%3E" alt="Video"></button>
         <button id="audio-toggle"><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2C9.11 2 7 4.11 7 7v10c0 2.89 2.11 5 5 5s5-2.11 5-5V7c0-2.89-2.11-5-5-5zm0 18c-2.21 0-4-1.79-4-4V7c0-2.21 1.79-4 4-4s4 1.79 4 4v9c0 2.21-1.79 4-4 4z'/%3E%3C/svg%3E" alt="Audio"></button>
         <button id="leave-btn">Leave Room</button>
     </div>
+
 
     <script>
         const roomCodeInput = document.getElementById('room-code');
@@ -213,29 +237,27 @@
         const audioToggle = document.getElementById('audio-toggle');
         const leaveButton = document.getElementById('leave-btn');
         const welcomeContainer = document.getElementById("welcome-container");
-        
+
         let localStream;
         let screenStream;
         let isScreenSharing = false;
         let peerConnections = {};
         let roomCode;
         let socket;
-        
+
         const iceServers = {
             iceServers: [
                 { urls: 'stun:stun.l.google.com:19302' },
                 { urls: 'stun:stun1.l.google.com:19302' }
             ]
         };
-        
+
         let videoEnabled = true;
         let audioEnabled = true;
 
         // Connect to websocket server
         function connectSocket() {
-            // Use secure websocket if on HTTPS
             const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
-            // Connect to your server - use the hostname from window.location or your deployed server URL
             const wsUrl = protocol + window.location.host;
             socket = new WebSocket(wsUrl);
 
@@ -245,7 +267,7 @@
 
             socket.onmessage = async (event) => {
                 const message = JSON.parse(event.data);
-                
+
                 switch(message.type) {
                     case 'room-created':
                         roomCode = message.roomCode;
@@ -254,13 +276,13 @@
                         await initLocalStream();
                         joinRoom(roomCode);
                         break;
-                        
+
                     case 'user-joined':
                         console.log('User joined room', message.userId);
                         await createPeerConnection(message.userId);
                         sendOffer(message.userId);
                         break;
-                        
+
                     case 'user-left':
                         if (peerConnections[message.userId]) {
                             removeVideoElement(message.userId);
@@ -268,23 +290,23 @@
                             delete peerConnections[message.userId];
                         }
                         break;
-                        
+
                     case 'offer':
                         handleOffer(message);
                         break;
-                        
+
                     case 'answer':
                         handleAnswer(message);
                         break;
-                        
+
                     case 'ice-candidate':
                         handleICECandidate(message);
                         break;
-                        
+
                     case 'screen-share-started':
                         handleRemoteScreenShare(message.userId, true);
                         break;
-                        
+
                     case 'screen-share-stopped':
                         handleRemoteScreenShare(message.userId, false);
                         break;
@@ -320,8 +342,7 @@
                     type: 'create-room'
                 }));
             };
-            
-            // Don't hide welcome container yet, wait for code
+
             videoGridElement.style.display = "grid";
             screenShareSectionElement.style.display = "block";
             controlsElement.style.display = "block";
@@ -334,13 +355,13 @@
                 alert('Please enter a room code');
                 return;
             }
-            
+
             connectSocket();
             socket.onopen = async () => {
                 await initLocalStream();
                 joinRoom(roomCode);
             };
-            
+
             welcomeContainer.style.display = "none";
             videoGridElement.style.display = "grid";
             screenShareSectionElement.style.display = "block";
@@ -373,13 +394,11 @@
         async function createPeerConnection(userId) {
             const pc = new RTCPeerConnection(iceServers);
             peerConnections[userId] = pc;
-            
-            // Add local tracks to the connection
+
             localStream.getTracks().forEach(track => {
                 pc.addTrack(track, localStream);
             });
-            
-            // Handle ICE candidates
+
             pc.onicecandidate = (event) => {
                 if (event.candidate) {
                     socket.send(JSON.stringify({
@@ -389,34 +408,33 @@
                     }));
                 }
             };
-            
-            // Handle receiving remote tracks
+
             pc.ontrack = (event) => {
                 if (!document.getElementById(`remote-video-${userId}`)) {
                     const remoteVideo = document.createElement('video');
                     remoteVideo.id = `remote-video-${userId}`;
                     remoteVideo.autoplay = true;
                     remoteVideo.playsInline = true;
-                    
+
                     const participantDiv = document.createElement('div');
                     participantDiv.id = `participant-${userId}`;
                     participantDiv.className = 'participant';
-                    
+
                     const nameSpan = document.createElement('span');
                     nameSpan.className = 'participant-name';
                     nameSpan.textContent = `User ${userId.substring(0, 5)}`;
-                    
+
                     participantDiv.appendChild(remoteVideo);
                     participantDiv.appendChild(nameSpan);
                     videoGridElement.appendChild(participantDiv);
                 }
-                
+
                 const remoteVideo = document.getElementById(`remote-video-${userId}`);
                 if (remoteVideo.srcObject !== event.streams[0]) {
                     remoteVideo.srcObject = event.streams[0];
                 }
             };
-            
+
             return pc;
         }
 
@@ -425,7 +443,7 @@
             const pc = peerConnections[userId];
             const offer = await pc.createOffer();
             await pc.setLocalDescription(offer);
-            
+
             socket.send(JSON.stringify({
                 type: 'offer',
                 offer: offer,
@@ -436,17 +454,17 @@
         // Handle an incoming offer
         async function handleOffer(message) {
             const userId = message.userId;
-            
+
             if (!peerConnections[userId]) {
                 await createPeerConnection(userId);
             }
-            
+
             const pc = peerConnections[userId];
             await pc.setRemoteDescription(new RTCSessionDescription(message.offer));
-            
+
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
-            
+
             socket.send(JSON.stringify({
                 type: 'answer',
                 answer: answer,
@@ -467,7 +485,7 @@
             const pc = peerConnections[message.userId];
             if (pc) {
                 await pc.addIceCandidate(new RTCIceCandidate(message.candidate));
-            }
+                }
         }
 
         // Remove a video element when a user leaves
@@ -507,14 +525,12 @@
                     screenShareVideo.style.display = 'block';
                     isScreenSharing = true;
                     screenShareButton.textContent = 'Stop Sharing';
-                    
-                    // Notify other users about screen sharing
+
                     socket.send(JSON.stringify({
                         type: 'screen-share-started',
                         roomCode: roomCode
                     }));
-                    
-                    // Replace video track in all peer connections
+
                     const videoTrack = screenStream.getVideoTracks()[0];
                     Object.values(peerConnections).forEach(pc => {
                         const senders = pc.getSenders();
@@ -523,8 +539,7 @@
                             sender.replaceTrack(videoTrack);
                         }
                     });
-                    
-                    // Stop sharing when track ends (user clicks "Stop sharing" in browser UI)
+
                     videoTrack.onended = () => {
                         stopScreenSharing();
                     };
@@ -544,14 +559,12 @@
                 screenShareVideo.style.display = 'none';
                 isScreenSharing = false;
                 screenShareButton.textContent = 'Share Screen';
-                
-                // Notify other users about stopping screen sharing
+
                 socket.send(JSON.stringify({
                     type: 'screen-share-stopped',
                     roomCode: roomCode
                 }));
-                
-                // Restore original video track
+
                 const videoTrack = localStream.getVideoTracks()[0];
                 if (videoTrack) {
                     Object.values(peerConnections).forEach(pc => {
@@ -583,35 +596,29 @@
                 type: 'leave-room',
                 roomCode: roomCode
             }));
-            
-            // Close all peer connections
+
             Object.values(peerConnections).forEach(pc => pc.close());
             peerConnections = {};
-            
-            // Stop local streams
+
             if (localStream) {
                 localStream.getTracks().forEach(track => track.stop());
             }
             if (screenStream) {
                 screenStream.getTracks().forEach(track => track.stop());
             }
-            
-            // Reset UI
+
             welcomeContainer.style.display = "block";
             codeDisplay.style.display = "none";
             videoGridElement.style.display = "none";
             screenShareSectionElement.style.display = "none";
             controlsElement.style.display = "none";
-            
-            // Clear video grid
+
             const participants = document.querySelectorAll('.participant:not(:first-child)');
             participants.forEach(p => p.remove());
-            
-            // Clear local video
+
             localVideo.srcObject = null;
             screenShareVideo.srcObject = null;
-            
-            // Close socket connection
+
             socket.close();
         });
     </script>
