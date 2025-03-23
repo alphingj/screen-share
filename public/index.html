@@ -302,14 +302,27 @@
 
         // Connect to websocket server
         function connectSocket() {
-            // FIXED: Use the correct WebSocket URL for your Render.com deployment
-            const wsUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.hostname}${window.location.port ? `:${window.location.port}` : ''}`;
+            // Fixed WebSocket URL construction
+            const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${wsProtocol}//${window.location.host}`;
             console.log("Connecting to WebSocket at:", wsUrl);
             
             socket = new WebSocket(wsUrl);
 
             socket.onopen = () => {
                 console.log('Connected to signaling server');
+                // This ensures we only try to create/join a room after the socket is actually open
+                if (socket.readyState === WebSocket.OPEN) {
+                    if (!roomCode) {
+                        // Creating a new room
+                        socket.send(JSON.stringify({
+                            type: 'create-room'
+                        }));
+                    } else {
+                        // Joining an existing room
+                        joinRoom(roomCode);
+                    }
+                }
             };
 
             socket.onmessage = async (event) => {
@@ -399,12 +412,7 @@
         createButton.addEventListener('click', async () => {
             await fetchIceServers();
             connectSocket();
-            socket.onopen = () => {
-                socket.send(JSON.stringify({
-                    type: 'create-room'
-                }));
-            };
-
+            
             welcomeContainer.style.display = "none";
             videoGridElement.style.display = "grid";
             screenShareSectionElement.style.display = "block";
@@ -419,12 +427,9 @@
                 return;
             }
             await fetchIceServers();
+            await initLocalStream();
             connectSocket();
-            socket.onopen = async () => {
-                await initLocalStream();
-                joinRoom(roomCode);
-            };
-
+            
             welcomeContainer.style.display = "none";
             videoGridElement.style.display = "grid";
             screenShareSectionElement.style.display = "block";
