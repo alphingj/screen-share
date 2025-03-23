@@ -1,14 +1,21 @@
 services:
   - type: web
-    name: signaling-server
+    name: screen-share-signaling
     env: node
-    plan: free
+    region: oregon # Choose your preferred region
+    plan: free # Use free tier - upgrade as needed
     buildCommand: npm install
-    startCommand: node server.js # Assuming your server file is named server.js
-    healthCheckPath: /status
+    startCommand: node server.js
+    healthCheckPath: /
     envVars:
-      - key: NODE_ENV
-        value: production
       - key: PORT
         value: 10000
     autoDeploy: true
+    domains:
+      - screen-share.onrender.com # Replace with your preferred subdomain
+
+# Networking configuration - ensures WebSockets work properly
+routes:
+  - type: rewrite
+    source: /*
+    destination: /
