@@ -2,7 +2,7 @@ services:
   - type: web
     name: signaling-server
     env: node
-    plan: starter # You can adjust this based on your needs (starter, standard, etc.)
+    plan: free
     buildCommand: npm install
     startCommand: node server.js # Assuming your server file is named server.js
     healthCheckPath: /status
@@ -10,5 +10,5 @@ services:
       - key: NODE_ENV
         value: production
       - key: PORT
-        value: 8080
+        value: 10000
     autoDeploy: true
