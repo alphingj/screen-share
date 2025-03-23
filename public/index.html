@@ -187,6 +187,25 @@
         #copy-code:hover {
             background-color: #777;
         }
+        
+        #screen-share-video {
+            width: 100%;
+            max-height: 50vh;
+            border: 2px solid violet;
+            display: none;
+        }
+        
+        #remote-screen-container {
+            width: 100%;
+            margin: 20px 0;
+            display: none;
+        }
+        
+        #remote-screen-video {
+            width: 100%;
+            max-height: 50vh;
+            border: 2px solid violet;
+        }
     </style>
 </head>
 <body>
@@ -204,16 +223,25 @@
             </div>
         </div>
     </div>
+    
+    <!-- Added a separate container for remote screen share -->
+    <div id="remote-screen-container">
+        <h3 id="remote-screen-title">Someone is sharing their screen</h3>
+        <video id="remote-screen-video" autoplay playsinline></video>
+    </div>
+    
     <div id="video-grid" style="display: none;">
         <div class="participant">
-            <video id="local-video" muted autoplay></video>
+            <video id="local-video" muted autoplay playsinline></video>
             <span class="participant-name">You</span>
         </div>
     </div>
+    
     <div id="screen-share-section" style="display: none;">
-        <video id="screen-share-video" autoplay></video>
+        <video id="screen-share-video" autoplay playsinline></video>
         <button id="screen-share-btn">Share Screen</button>
     </div>
+    
     <div id="controls" style="display: none;">
         <button id="video-toggle"><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z'/%3E%3C/svg%3E" alt="Video"></button>
         <button id="audio-toggle"><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2C9.11 2 7 4.11 7 7v10c0 2.89 2.11 5 5 5'/%3E%3C/svg%3E" alt="Audio"></button>
@@ -237,6 +265,9 @@
         const audioToggle = document.getElementById('audio-toggle');
         const leaveButton = document.getElementById('leave-btn');
         const welcomeContainer = document.getElementById("welcome-container");
+        const remoteScreenContainer = document.getElementById("remote-screen-container");
+        const remoteScreenVideo = document.getElementById("remote-screen-video");
+        const remoteScreenTitle = document.getElementById("remote-screen-title");
 
         let localStream;
         let screenStream;
@@ -245,6 +276,7 @@
         let roomCode;
         let socket;
         let iceServers;
+        let activeScreenSharer = null;
 
         let videoEnabled = true;
         let audioEnabled = true;
@@ -258,11 +290,11 @@
                 console.error("Failed to fetch TURN servers:", error);
                 iceServers = {
                     iceServers: [
-                        { urls: 'stun:74.125.192.127:19302' },  // stun.l.google.com
-                        { urls: 'stun:172.217.192.127:19302' }, // stun1.l.google.com
-                        { urls: 'stun:142.250.15.127:19302' },  // stun2.l.google.com
-                        { urls: 'stun:108.177.15.127:19302' },  // stun3.l.google.com
-                        { urls: 'stun:108.177.119.127:19302' }  // stun4.l.google.com
+                        { urls: 'stun:stun.l.google.com:19302' },
+                        { urls: 'stun:stun1.l.google.com:19302' },
+                        { urls: 'stun:stun2.l.google.com:19302' },
+                        { urls: 'stun:stun3.l.google.com:19302' },
+                        { urls: 'stun:stun4.l.google.com:19302' }
                     ]
                 }; // Fallback to STUN servers if TURN fetch fails
             }
@@ -270,8 +302,10 @@
 
         // Connect to websocket server
         function connectSocket() {
-            const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
-            const wsUrl = protocol + window.location.host;
+            // FIXED: Use the correct WebSocket URL for your Render.com deployment
+            const wsUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.hostname}${window.location.port ? `:${window.location.port}` : ''}`;
+            console.log("Connecting to WebSocket at:", wsUrl);
+            
             socket = new WebSocket(wsUrl);
 
             socket.onopen = () => {
@@ -280,6 +314,7 @@
 
             socket.onmessage = async (event) => {
                 const message = JSON.parse(event.data);
+                console.log("Received message:", message.type);
 
                 switch(message.type) {
                     case 'room-created':
@@ -301,6 +336,12 @@
                             removeVideoElement(message.userId);
                             peerConnections[message.userId].close();
                             delete peerConnections[message.userId];
+                            
+                            // Check if screen sharer left
+                            if (message.userId === activeScreenSharer) {
+                                activeScreenSharer = null;
+                                remoteScreenContainer.style.display = 'none';
+                            }
                         }
                         break;
 
@@ -317,10 +358,12 @@
                         break;
 
                     case 'screen-share-started':
+                        console.log("Remote screen share started by:", message.userId);
                         handleRemoteScreenShare(message.userId, true);
                         break;
 
                     case 'screen-share-stopped':
+                        console.log("Remote screen share stopped by:", message.userId);
                         handleRemoteScreenShare(message.userId, false);
                         break;
 
@@ -337,7 +380,6 @@
             socket.onerror = (error) => {
                 console.error('WebSocket error:', error);
                 alert('WebSocket connection error. Please try again.');
-                // Add reconnect logic here if needed
             };
         }
 
@@ -363,6 +405,7 @@
                 }));
             };
 
+            welcomeContainer.style.display = "none";
             videoGridElement.style.display = "grid";
             screenShareSectionElement.style.display = "block";
             controlsElement.style.display = "block";
@@ -412,12 +455,30 @@
 
         // Create a peer connection for a specific user
         async function createPeerConnection(userId) {
+            console.log("Creating peer connection for user:", userId);
             const pc = new RTCPeerConnection(iceServers);
             peerConnections[userId] = pc;
 
-            localStream.getTracks().forEach(track => {
-                pc.addTrack(track, localStream);
-            });
+            // Add appropriate tracks based on whether we're screen sharing or not
+            if (isScreenSharing && screenStream) {
+                // If we're sharing screen, send screen video and audio from camera
+                screenStream.getVideoTracks().forEach(track => {
+                    console.log("Adding screen track to peer connection:", track.kind);
+                    pc.addTrack(track, screenStream);
+                });
+                
+                // Add audio track from local stream
+                localStream.getAudioTracks().forEach(track => {
+                    console.log("Adding audio track to peer connection:", track.kind);
+                    pc.addTrack(track, localStream);
+                });
+            } else {
+                // Otherwise send camera+audio
+                localStream.getTracks().forEach(track => {
+                    console.log("Adding local track to peer connection:", track.kind);
+                    pc.addTrack(track, localStream);
+                });
+            }
 
             pc.onicecandidate = (event) => {
                 if (event.candidate) {
@@ -430,6 +491,22 @@
             };
 
             pc.ontrack = (event) => {
+                console.log("Remote track received:", event.track.kind);
+                
+                if (event.track.kind === 'video') {
+                    // Check if this is a screen share track
+                    const isScreenTrack = event.streams[0].getVideoTracks()[0].label.includes('screen') || 
+                                         event.streams[0].id.includes('screen');
+                    
+                    if (isScreenTrack && userId === activeScreenSharer) {
+                        console.log("Processing screen share video track");
+                        remoteScreenVideo.srcObject = event.streams[0];
+                        remoteScreenContainer.style.display = 'block';
+                        return;
+                    }
+                }
+                
+                // Handle regular camera tracks
                 if (!document.getElementById(`remote-video-${userId}`)) {
                     const remoteVideo = document.createElement('video');
                     remoteVideo.id = `remote-video-${userId}`;
@@ -456,15 +533,11 @@
             };
 
             pc.oniceconnectionstatechange = () => {
-                console.log("ICE connection state changed to: ", pc.iceConnectionState);
+                console.log(`ICE connection state for ${userId} changed to: ${pc.iceConnectionState}`);
             }
 
             pc.onconnectionstatechange = () => {
-                console.log("connection state changed to: ", pc.connectionState);
-            }
-
-            pc.onerror = (error) => {
-                console.error("Peer connection error: ", error);
+                console.log(`Connection state for ${userId} changed to: ${pc.connectionState}`);
             }
 
             return pc;
@@ -473,50 +546,66 @@
         // Send an offer to a specific user
         async function sendOffer(userId) {
             const pc = peerConnections[userId];
-            const offer = await pc.createOffer();
-            await pc.setLocalDescription(offer);
+            try {
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
 
-            socket.send(JSON.stringify({
-                type: 'offer',
-                offer: offer,
-                userId: userId
-            }));
+                socket.send(JSON.stringify({
+                    type: 'offer',
+                    offer: offer,
+                    userId: userId
+                }));
+            } catch (error) {
+                console.error("Error creating/sending offer:", error);
+            }
         }
 
         // Handle an incoming offer
         async function handleOffer(message) {
             const userId = message.userId;
 
-            if (!peerConnections[userId]) {
-                await createPeerConnection(userId);
+            try {
+                if (!peerConnections[userId]) {
+                    await createPeerConnection(userId);
+                }
+
+                const pc = peerConnections[userId];
+                await pc.setRemoteDescription(new RTCSessionDescription(message.offer));
+
+                const answer = await pc.createAnswer();
+                await pc.setLocalDescription(answer);
+
+                socket.send(JSON.stringify({
+                    type: 'answer',
+                    answer: answer,
+                    userId: userId
+                }));
+            } catch (error) {
+                console.error("Error handling offer:", error);
             }
-
-            const pc = peerConnections[userId];
-            await pc.setRemoteDescription(new RTCSessionDescription(message.offer));
-
-            const answer = await pc.createAnswer();
-            await pc.setLocalDescription(answer);
-
-            socket.send(JSON.stringify({
-                type: 'answer',
-                answer: answer,
-                userId: userId
-            }));
         }
 
         // Handle an incoming answer
         async function handleAnswer(message) {
-            const pc = peerConnections[message.userId];
-            if (pc) {
-                await pc.setRemoteDescription(new RTCSessionDescription(message.answer));
+            try {
+                const pc = peerConnections[message.userId];
+                if (pc) {
+                    await pc.setRemoteDescription(new RTCSessionDescription(message.answer));
+                }
+            } catch (error) {
+                console.error("Error handling answer:", error);
             }
         }
 
         // Handle an incoming ICE candidate
         async function handleICECandidate(message) {
-            const pc = peerConnections[message.userId];
-            if (pc) {
-                await pc.addIceCandidate(new RTCIceCandidate(message.candidate));
+            try {
+                const pc = peerConnections[message.userId];
+                if (pc) {
+                    await pc.addIceCandidate(new RTCIceCandidate(message.candidate));
+                }
+            } catch (error) {
+                console.error("Error handling ICE candidate:", error);
             }
         }
 
@@ -551,27 +640,37 @@
             if (!isScreenSharing) {
                 try {
                     screenStream = await navigator.mediaDevices.getDisplayMedia({
-                        video: true
+                        video: {
+                            cursor: 'always',
+                            displaySurface: 'monitor'
+                        }
                     });
+                    
                     screenShareVideo.srcObject = screenStream;
                     screenShareVideo.style.display = 'block';
                     isScreenSharing = true;
                     screenShareButton.textContent = 'Stop Sharing';
 
+                    // Notify other users
                     socket.send(JSON.stringify({
                         type: 'screen-share-started',
                         roomCode: roomCode
                     }));
 
+                    // Get screen video track
                     const videoTrack = screenStream.getVideoTracks()[0];
-                    Object.values(peerConnections).forEach(pc => {
+                    
+                    // Replace video tracks in all peer connections
+                    Object.entries(peerConnections).forEach(([id, pc]) => {
                         const senders = pc.getSenders();
                         const sender = senders.find(s => s.track && s.track.kind === 'video');
                         if (sender) {
+                            console.log("Replacing video track with screen track");
                             sender.replaceTrack(videoTrack);
                         }
                     });
 
+                    // Handle screen sharing ending through the browser UI
                     videoTrack.onended = () => {
                         stopScreenSharing();
                     };
@@ -593,17 +692,20 @@
                 isScreenSharing = false;
                 screenShareButton.textContent = 'Share Screen';
 
+                // Notify other users
                 socket.send(JSON.stringify({
                     type: 'screen-share-stopped',
                     roomCode: roomCode
                 }));
 
+                // Replace screen track with video track in all peer connections
                 const videoTrack = localStream.getVideoTracks()[0];
                 if (videoTrack) {
-                    Object.values(peerConnections).forEach(pc => {
+                    Object.entries(peerConnections).forEach(([id, pc]) => {
                         const senders = pc.getSenders();
                         const sender = senders.find(s => s.track && s.track.kind === 'video');
                         if (sender) {
+                            console.log("Replacing screen track with camera track");
                             sender.replaceTrack(videoTrack);
                         }
                     });
@@ -613,12 +715,35 @@
 
         // Handle remote screen sharing
         function handleRemoteScreenShare(userId, isSharing) {
-            const remoteVideo = document.getElementById(`remote-video-${userId}`);
-            if (remoteVideo) {
-                if (isSharing) {
-                    remoteVideo.style.border = '2px solid violet';
-                } else {
-                    remoteVideo.style.border = 'none';
+            if (isSharing) {
+                console.log(`User ${userId} started screen sharing`);
+                activeScreenSharer = userId;
+                remoteScreenTitle.textContent = `User ${userId.substring(0, 5)} is sharing their screen`;
+                
+                // We'll wait for the ontrack event to handle the actual video
+                // but we can show the container now
+                remoteScreenContainer.style.display = 'block';
+                
+                // For existing connections, we need to check if we already have their stream
+                const pc = peerConnections[userId];
+                if (pc) {
+                    const remoteStreams = pc.getReceivers()
+                        .filter(receiver => receiver.track && receiver.track.kind === 'video')
+                        .map(receiver => receiver.track);
+                    
+                    if (remoteStreams.length > 0) {
+                        // Use the first video track we find
+                        const stream = new MediaStream();
+                        stream.addTrack(remoteStreams[0]);
+                        remoteScreenVideo.srcObject = stream;
+                    }
+                }
+            } else {
+                console.log(`User ${userId} stopped screen sharing`);
+                if (userId === activeScreenSharer) {
+                    activeScreenSharer = null;
+                    remoteScreenContainer.style.display = 'none';
+                    remoteScreenVideo.srcObject = null;
                 }
             }
         }
@@ -645,12 +770,16 @@
             videoGridElement.style.display = "none";
             screenShareSectionElement.style.display = "none";
             controlsElement.style.display = "none";
+            remoteScreenContainer.style.display = "none";
 
             const participants = document.querySelectorAll('.participant:not(:first-child)');
             participants.forEach(p => p.remove());
 
             localVideo.srcObject = null;
             screenShareVideo.srcObject = null;
+            remoteScreenVideo.srcObject = null;
+            isScreenSharing = false;
+            activeScreenSharer = null;
 
             socket.close();
         });
