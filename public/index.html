@@ -216,7 +216,8 @@
     </div>
     <div id="controls" style="display: none;">
         <button id="video-toggle"><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z'/%3E%3C/svg%3E" alt="Video"></button>
-        <button id="audio-toggle"><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2C9.11 2 7 4.11 7 7v10c0 2.89 2.11 5 5 5<button id="leave-btn">Leave Room</button>
+        <button id="audio-toggle"><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2C9.11 2 7 4.11 7 7v10c0 2.89 2.11 5 5 5'/%3E%3C/svg%3E" alt="Audio"></button>
+        <button id="leave-btn">Leave Room</button>
     </div>
 
     <script>
@@ -257,8 +258,11 @@
                 console.error("Failed to fetch TURN servers:", error);
                 iceServers = {
                     iceServers: [
-                        { urls: 'stun:stun.l.google.com:19302' },
-                        { urls: 'stun:stun1.l.google.com:19302' },
+                        { urls: 'stun:74.125.192.127:19302' },  // stun.l.google.com
+                        { urls: 'stun:172.217.192.127:19302' }, // stun1.l.google.com
+                        { urls: 'stun:142.250.15.127:19302' },  // stun2.l.google.com
+                        { urls: 'stun:108.177.15.127:19302' },  // stun3.l.google.com
+                        { urls: 'stun:108.177.119.127:19302' }  // stun4.l.google.com
                     ]
                 }; // Fallback to STUN servers if TURN fetch fails
             }
@@ -590,6 +594,38 @@
                 screenShareButton.textContent = 'Share Screen';
 
                 socket.send(JSON.stringify({
+                    type: 'screen-share-stopped',
+                    roomCode: roomCode
+                }));
+
+                const videoTrack = localStream.getVideoTracks()[0];
+                if (videoTrack) {
+                    Object.values(peerConnections).forEach(pc => {
+                        const senders = pc.getSenders();
+                        const sender = senders.find(s => s.track && s.track.kind === 'video');
+                        if (sender) {
+                            sender.replaceTrack(videoTrack);
+                        }
+                    });
+                }
+            }
+        }
+
+        // Handle remote screen sharing
+        function handleRemoteScreenShare(userId, isSharing) {
+            const remoteVideo = document.getElementById(`remote-video-${userId}`);
+            if (remoteVideo) {
+                if (isSharing) {
+                    remoteVideo.style.border = '2px solid violet';
+                } else {
+                    remoteVideo.style.border = 'none';
+                }
+            }
+        }
+
+        // Leave the room
+        leaveButton.addEventListener('click', () => {
+            socket.send(JSON.stringify({
                 type: 'leave-room',
                 roomCode: roomCode
             }));
